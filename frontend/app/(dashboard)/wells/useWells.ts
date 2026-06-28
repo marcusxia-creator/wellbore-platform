@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import type { Well, Substation, MapMarker, WellSection, SectionFilters } from "@/lib/types";
+import type { Well, Substation, MapMarker, WellSection } from "@/lib/types";
 import { fetchSubstations } from "@/lib/api";
 import { useWellsStore } from "@/lib/wells-store";
 
@@ -12,12 +12,9 @@ export function wellStrm(w: Well): string {
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
 export function useWells() {
-  // Wells + section cache come from the shared store
-  const { allWells, wellsLoading: loading, getSections } = useWellsStore();
+  const { allWells, wellsLoading: loading } = useWellsStore();
 
-  const [sections, setSections]                   = useState<WellSection[]>([]);
   const [allSubstations, setAllSubstations]       = useState<Substation[]>([]);
-  const [sectionsLoading, setSectionsLoading]     = useState(true);
   const [substationsLoaded, setSubstationsLoaded] = useState(false);
 
   // Filters
@@ -36,34 +33,6 @@ export function useWells() {
   // Drill-down
   const [selectedStrm, setSelectedStrm] = useState<string | null>(null);
 
-  // ── Fetch sections from the store (cached) whenever ATS filters change ────────
-
-  useEffect(() => {
-    if (format !== "ATS") { setSections([]); setSectionsLoading(false); return; }
-
-    setSectionsLoading(true);
-    let cancelled = false;
-
-    const filters: SectionFilters = {
-      ...(statusGroup !== "ALL"     && { well_status_group: statusGroup }),
-      ...(orphanOnly                && { orphan: true }),
-      ...(holeType === "Horizontal" && { horizontal_hole: true }),
-      ...(holeType === "Deviated"   && { deviated_hole: true }),
-      ...(selTownships.length > 0   && { township: selTownships as number[] }),
-      ...(selRanges.length    > 0   && { range: selRanges as number[] }),
-      ...(selMeridians.length > 0   && { meridian: selMeridians as number[] }),
-    };
-
-    getSections(filters)
-      .then((data) => { if (!cancelled) setSections(data); })
-      .catch(() => { if (!cancelled) setSections([]); })
-      .finally(() => { if (!cancelled) setSectionsLoading(false); });
-
-    return () => { cancelled = true; };
-  // getSections is stable (defined outside render), safe to include
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [format, statusGroup, orphanOnly, holeType, selTownships, selRanges, selMeridians]);
-
   useEffect(() => {
     if (showSubs && !substationsLoaded) {
       fetchSubstations({}, 1, 10000)
@@ -77,7 +46,6 @@ export function useWells() {
 
   // ── Derived data ──────────────────────────────────────────────────────────────
 
-  // filteredWells: used for drill-down well view and NTS map
   const filteredWells = useMemo(() => {
     let out = allWells.filter((w) => w.format === format);
     if (statusGroup !== "ALL")     out = out.filter((w) => w.well_status_group === statusGroup);
@@ -91,6 +59,28 @@ export function useWells() {
     }
     return out;
   }, [allWells, format, statusGroup, orphanOnly, holeType, selTownships, selRanges, selMeridians]);
+
+  // sections: derived synchronously from filteredWells — keeps map and cards in sync
+  const sections = useMemo<WellSection[]>(() => {
+    if (format !== "ATS") return [];
+    const map = new Map<string, { ws: Well[]; vol: number }>();
+    for (const w of filteredWells) {
+      if (!w.surf_latitude || !w.surf_longitude) continue;
+      if (!w.section || !w.township || !w.range || !w.meridian) continue;
+      const key = wellStrm(w);
+      if (!map.has(key)) map.set(key, { ws: [], vol: 0 });
+      const entry = map.get(key)!;
+      entry.ws.push(w);
+      entry.vol += w.available_volume_m3 ?? 0;
+    }
+    return Array.from(map.entries()).map(([strm, { ws, vol }]) => ({
+      strm,
+      lat: ws.reduce((s, w) => s + w.surf_latitude,  0) / ws.length,
+      lng: ws.reduce((s, w) => s + w.surf_longitude, 0) / ws.length,
+      wellCount: ws.length,
+      totalVolume: vol,
+    }));
+  }, [filteredWells, format]);
 
   const topSection = useMemo(() =>
     sections.length === 0 ? null
@@ -149,7 +139,7 @@ export function useWells() {
 
   return {
     // state
-    loading, sectionsLoading, tileStyle, format, statusGroup, holeType,
+    loading, tileStyle, format, statusGroup, holeType,
     orphanOnly, showSubs, selTownships, selRanges, selMeridians, selectedStrm,
     // setters
     setTileStyle, setFormat, setStatusGroup, setHoleType,

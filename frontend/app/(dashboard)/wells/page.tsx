@@ -16,7 +16,7 @@ const WellMap = dynamic(() => import("@/components/maps/WellMap"), { ssr: false 
 
 export default function WellsPage() {
   const {
-    loading, sectionsLoading, tileStyle, format, statusGroup, holeType,
+    loading, tileStyle, format, statusGroup, holeType,
     orphanOnly, showSubs, selTownships, selRanges, selMeridians, selectedStrm,
     setTileStyle, setFormat, setStatusGroup, setHoleType,
     setOrphanOnly, setShowSubs, setSelTownships, setSelRanges, setSelMeridians,
@@ -72,7 +72,7 @@ export default function WellsPage() {
               {format === "ATS" ? "Sections" : "Horizontal"}
             </p>
             <p className="mt-1 text-xl font-semibold text-slate-900">
-              {loading || sectionsLoading
+              {loading
                 ? "…"
                 : format === "ATS"
                   ? formatNumber(sections.length)

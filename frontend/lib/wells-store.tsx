@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useRef, type ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo, type ReactNode } from "react";
 import type { Well, WellSection, SectionFilters } from "./types";
 import { fetchWells, fetchSections } from "./api";
 
@@ -61,7 +61,7 @@ export function WellsProvider({ children }: { children: ReactNode }) {
 
   // ── Section fetcher with cache ─────────────────────────────────────────────
 
-  async function getSections(filters: SectionFilters): Promise<WellSection[]> {
+  const getSections = useCallback(async (filters: SectionFilters): Promise<WellSection[]> => {
     const key = JSON.stringify(filters);
 
     if (sectionCache.current.has(key)) return sectionCache.current.get(key)!;
@@ -77,10 +77,15 @@ export function WellsProvider({ children }: { children: ReactNode }) {
 
     inflight.current.set(key, promise);
     return promise;
-  }
+  }, []); // only uses refs — stable for the lifetime of the provider
+
+  const ctx = useMemo(
+    () => ({ allWells, wellsLoading, getSections }),
+    [allWells, wellsLoading, getSections]
+  );
 
   return (
-    <WellsContext.Provider value={{ allWells, wellsLoading, getSections }}>
+    <WellsContext.Provider value={ctx}>
       {children}
     </WellsContext.Provider>
   );

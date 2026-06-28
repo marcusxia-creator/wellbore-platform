@@ -244,12 +244,21 @@ export default function WellMap({
 
       const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, maxWidth: "260px" });
 
-      // Re-add sources/layers after every style load (init + setStyle)
+      // Re-add sources/layers after every style load (init + setStyle).
+      // Also call resize() here: the container may not have its final CSS dimensions
+      // when the map is first constructed (common in flex layouts), which leaves the
+      // canvas blank. resize() forces MapLibre to re-read the container size.
       map.on("style.load", () => {
         if (!alive) return;
+        map.resize();
         addSourcesAndLayers(map);
         setData(map, buildGeoJSON(markersRef.current, colorModeRef.current));
       });
+
+      // Keep the canvas in sync if the container is resized later
+      // (e.g. sidebar collapse, window resize).
+      const ro = new ResizeObserver(() => { map.resize(); });
+      if (containerRef.current) ro.observe(containerRef.current);
 
       const HOVER = ["sections-layer", "wells-status", "wells-volume", "substations-fill"];
 
@@ -275,21 +284,38 @@ export default function WellMap({
       });
 
       mapRef.current = map;
+      mapRef.current._ro = ro; // stash so cleanup can disconnect it
     });
 
     return () => {
       alive = false;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (mapRef.current as any)?._ro?.disconnect();
       mapRef.current?.remove();
       mapRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Update GeoJSON data when markers or colorMode change
+  // Update GeoJSON data when markers or colorMode change.
+  // If the style isn't ready yet, the style.load handler will pick up the latest
+  // markersRef when it fires — so we only need to act when the style is already up.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map?.isStyleLoaded()) return;
-    setData(map, buildGeoJSON(markers, wellColorMode));
+    if (!map) return;
+    if (map.isStyleLoaded()) {
+      setData(map, buildGeoJSON(markers, wellColorMode));
+    } else {
+      // Style is mid-load (e.g. tile-style switch just triggered); let style.load handle it.
+      // markersRef is already up-to-date so no data will be missed.
+      const onLoad = () => {
+        map.resize();
+        addSourcesAndLayers(map);
+        setData(map, buildGeoJSON(markersRef.current, colorModeRef.current));
+      };
+      map.once("style.load", onLoad);
+      return () => { map.off("style.load", onLoad); };
+    }
   }, [markers, wellColorMode]);
 
   // Swap tile style
