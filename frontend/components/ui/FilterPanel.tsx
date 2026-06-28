@@ -172,6 +172,7 @@ export function MultiSelectFilter({
       <label className="text-xs font-medium text-slate-500">{label}</label>
       <ReactSelect
         isMulti
+        instanceId={`filter-${label}`}
         options={selectOptions}
         value={selectValue}
         onChange={(selected) => onChange(selected.map((s) => s.value))}

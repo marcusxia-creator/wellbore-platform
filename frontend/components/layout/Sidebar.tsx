@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
-  Layers,
   Zap,
   MapPin,
   Target,
@@ -14,8 +13,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Drill,
+  Gauge,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+// Sidebar uses warm "stone" neutrals (not cool stone) to harmonize with the
+// page's warm cream background (#f8f7f2).
 
 const NAV_ITEMS = [
   { href: "/wells", label: "Wells", icon: Drill },
@@ -27,6 +29,8 @@ const NAV_ITEMS = [
   { href: "/substation-candidates", label: "Sub. Candidates", icon: PlusCircle },
 ] as const;
 
+const IS_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === "true";
+
 export default function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
@@ -34,51 +38,103 @@ export default function Sidebar() {
   return (
     <aside
       className={cn(
-        "relative flex flex-col bg-slate-900 text-slate-100 transition-all duration-300 ease-in-out h-screen sticky top-0 shrink-0",
-        collapsed ? "w-16" : "w-56"
+        "sticky top-0 z-20 flex h-screen shrink-0 flex-col text-stone-300",
+        "bg-gradient-to-b from-stone-900 to-stone-950 border-r border-white/5",
+        "transition-[width] duration-300 ease-in-out",
+        collapsed ? "w-[68px]" : "w-60"
       )}
     >
       {/* Logo */}
-      <div className="flex items-center gap-3 px-4 py-5 border-b border-slate-700">
-        <Layers className="shrink-0 text-emerald-400" size={22} />
+      <div
+        className={cn(
+          "flex h-16 items-center gap-3 border-b border-white/5 px-4",
+          collapsed && "justify-center px-0"
+        )}
+      >
+        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-lg shadow-emerald-900/40">
+          <Gauge className="text-white" size={20} />
+        </div>
         {!collapsed && (
-          <span className="font-semibold text-base tracking-tight text-white">
-            WellScout
-          </span>
+          <div className="leading-tight">
+            <p className="text-[15px] font-semibold tracking-tight text-white">
+              WellScout
+            </p>
+            <p className="text-[11px] text-stone-400">Terralog Technologies</p>
+          </div>
         )}
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto py-4 space-y-1 px-2">
-        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || pathname.startsWith(href + "/");
-          return (
-            <Link
-              key={href}
-              href={href}
-              title={collapsed ? label : undefined}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                active
-                  ? "bg-emerald-600 text-white"
-                  : "text-slate-300 hover:bg-slate-800 hover:text-white"
-              )}
-            >
-              <Icon size={18} className="shrink-0" />
-              {!collapsed && <span className="truncate">{label}</span>}
-            </Link>
-          );
-        })}
+      <nav className="flex-1 overflow-y-auto px-3 py-4">
+        {!collapsed && (
+          <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-wider text-stone-500">
+            Menu
+          </p>
+        )}
+        <ul className="space-y-1">
+          {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+            const active = pathname === href || pathname.startsWith(href + "/");
+            return (
+              <li key={href}>
+                <Link
+                  href={href}
+                  title={collapsed ? label : undefined}
+                  className={cn(
+                    "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                    collapsed && "justify-center px-0",
+                    active
+                      ? "bg-emerald-500/10 text-white"
+                      : "text-stone-400 hover:bg-white/5 hover:text-stone-100"
+                  )}
+                >
+                  {active && (
+                    <span className="absolute left-0 top-1/2 h-5 w-1 -transtone-y-1/2 rounded-r-full bg-emerald-400" />
+                  )}
+                  <Icon
+                    size={18}
+                    className={cn(
+                      "shrink-0 transition-colors",
+                      active
+                        ? "text-emerald-400"
+                        : "text-stone-500 group-hover:text-stone-200"
+                    )}
+                  />
+                  {!collapsed && <span className="truncate">{label}</span>}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
       </nav>
 
-      {/* Collapse toggle */}
-      <button
-        onClick={() => setCollapsed((c) => !c)}
-        className="absolute -right-3 top-16 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-slate-700 text-slate-300 hover:bg-slate-600 hover:text-white shadow-md transition-colors"
-        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-      >
-        {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-      </button>
+      {/* Footer: status + collapse */}
+      <div className="border-t border-white/5 p-3">
+        <div
+          className={cn(
+            "mb-2 flex items-center gap-2 px-2 text-[11px] text-stone-500",
+            collapsed && "justify-center px-0"
+          )}
+        >
+          <span
+            className={cn(
+              "h-2 w-2 shrink-0 rounded-full",
+              IS_MOCK ? "bg-amber-400" : "bg-emerald-500"
+            )}
+          />
+          {!collapsed && <span>{IS_MOCK ? "Demo data" : "Live data"}</span>}
+        </div>
+        <button
+          onClick={() => setCollapsed((c) => !c)}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className={cn(
+            "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-stone-400 transition-colors hover:bg-white/5 hover:text-stone-100",
+            collapsed && "justify-center px-0"
+          )}
+        >
+          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+          {!collapsed && <span>Collapse</span>}
+        </button>
+      </div>
     </aside>
   );
 }
