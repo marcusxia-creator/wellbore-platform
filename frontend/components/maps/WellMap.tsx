@@ -169,13 +169,15 @@ function addSourcesAndLayers(map: any) {
         "circle-stroke-color": VOL_STROKE,
       }});
 
-  // Substations: dark border + orange fill (mirrors Dash two-layer approach)
-  if (!map.getLayer("substations-border"))
-    map.addLayer({ id: "substations-border", type: "circle", source: "substations",
-      paint: { "circle-radius": 11, "circle-color": "#1e293b", "circle-opacity": 0.9 } });
   if (!map.getLayer("substations-fill"))
     map.addLayer({ id: "substations-fill", type: "circle", source: "substations",
-      paint: { "circle-radius": 8, "circle-color": "#f97316" } });
+      paint: {
+        "circle-radius": 5,
+        "circle-color": "#eab308",
+        "circle-opacity": 0.9,
+        "circle-stroke-width": 1,
+        "circle-stroke-color": "white",
+      } });
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -198,7 +200,7 @@ const popupHtml = (layerId: string, p: Props) =>
     ? `<b>Section ${p.strm}</b><br/>Wells: ${p.wellCount}<br/>Volume: ${fmt(p.totalVolume)} m³`
   : layerId === "wells-status" || layerId === "wells-volume"
     ? `<b>${p.uwi}</b><br/>Status: ${p.status}<br/>Volume: ${fmt(p.volume)} m³${p.distMi ? `<br/>Distance: ${p.distMi} mi` : ""}`
-  : `<b>${p.name}</b><br/>Code: ${p.code}${p.capacityMw != null ? `<br/>Capacity: ${p.capacityMw} MW` : ""}`;
+  : `<b>${p.name}</b>`;
 
 // ── Component ─────────────────────────────────────────────────────────────────
 

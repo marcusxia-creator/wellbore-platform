@@ -1,23 +1,22 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import dynamic from "next/dynamic";
-import { Zap, Map, Table2 } from "lucide-react";
-import PageHeader from "@/components/layout/PageHeader";
-import FilterPanel, { SelectFilter, SearchInput } from "@/components/ui/FilterPanel";
+import { Map, Table2, Zap } from "lucide-react";
+import FilterPanel, { RadioFilter, SelectFilter, SearchInput } from "@/components/ui/FilterPanel";
 import DataTable, { type Column } from "@/components/ui/DataTable";
-import StatCard from "@/components/ui/StatCard";
-import type { Substation, SubstationFilters, MapMarker } from "@/lib/types";
-import { fetchSubstations, fetchSubstationFilterOptions } from "@/lib/api";
+import type { Substation } from "@/lib/types";
 import { formatNumber } from "@/lib/utils";
+import { useSubstations, type ViewMode } from "./useSubstations";
+import { MAP_STYLE_OPTIONS } from "../wells/constants";
 
 const WellMap = dynamic(() => import("@/components/maps/WellMap"), { ssr: false });
 
 const COLUMNS: Column<Substation>[] = [
-  { key: "facility_code", header: "Code",         sortable: true  },
-  { key: "name",          header: "Name",         sortable: true  },
-  { key: "land_location", header: "Land Location",sortable: true  },
-  { key: "area",          header: "Area",         sortable: true  },
+  { key: "facility_code", header: "Code",          sortable: true  },
+  { key: "name",          header: "Name",          sortable: true  },
+  { key: "land_location", header: "Land Location", sortable: true  },
+  { key: "area",          header: "Area",          sortable: true  },
   {
     key: "township",
     header: "Twp-Rge-Mer",
@@ -45,107 +44,97 @@ const COLUMNS: Column<Substation>[] = [
   { key: "address", header: "Address", sortable: false },
 ];
 
-type ViewMode = "split" | "map" | "table";
+const VIEW_OPTIONS: { value: ViewMode; label: string; icon: React.ReactNode }[] = [
+  { value: "split", label: "Split", icon: <Zap    size={13} /> },
+  { value: "map",   label: "Map",   icon: <Map    size={13} /> },
+  { value: "table", label: "Table", icon: <Table2 size={13} /> },
+];
 
 export default function SubstationsPage() {
-  const [substations, setSubstations] = useState<Substation[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [total, setTotal] = useState(0);
-  const [viewMode, setViewMode] = useState<ViewMode>("split");
+  const {
+    substations, loading, total, viewMode,
+    search, area, areaOptions,
+    setViewMode, setSearch, setArea, reset,
+    markers, withCapacity,
+  } = useSubstations();
 
-  const [search, setSearch] = useState("");
-  const [area, setArea] = useState("");
-  const [areaOptions, setAreaOptions] = useState<{ value: string; label: string }[]>([]);
-
-  useEffect(() => {
-    fetchSubstationFilterOptions()
-      .then((opts) => setAreaOptions(opts.areas))
-      .catch(() => setAreaOptions([
-        { value: "AB", label: "AB" },
-        { value: "SK", label: "SK" },
-        { value: "BC", label: "BC" },
-      ]));
-  }, []);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const filters: SubstationFilters = {
-        ...(search && { search }),
-        ...(area   && { area }),
-      };
-      const res = await fetchSubstations(filters, 1, 1000);
-      setSubstations(res.results);
-      setTotal(res.count);
-    } catch {
-      setSubstations([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [search, area]);
-
-  useEffect(() => {
-    const t = setTimeout(load, 400);
-    return () => clearTimeout(t);
-  }, [load]);
-
-  const reset = () => { setSearch(""); setArea(""); };
-
-  const markers: MapMarker[] = substations.map((s) => ({ type: "substation", data: s }));
-  const withCapacity = substations.filter((s) => s.capacity_mw != null).length;
+  const [tileStyle, setTileStyle] = useState("basic");
 
   return (
-    <div>
-      <PageHeader
-        title="Substations"
-        description={`Showing ${substations.length.toLocaleString()} of ${total.toLocaleString()} substations`}
-        actions={
-          <div className="flex gap-1 rounded-lg border border-slate-200 bg-white p-1">
-            {(["split", "map", "table"] as ViewMode[]).map((v) => (
-              <button
-                key={v}
-                onClick={() => setViewMode(v)}
-                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                  viewMode === v ? "bg-emerald-600 text-white" : "text-slate-500 hover:text-slate-800"
-                }`}
-              >
-                {v === "map" ? <Map size={13} /> : v === "table" ? <Table2 size={13} /> : <Zap size={13} />}
-                {v.charAt(0).toUpperCase() + v.slice(1)}
-              </button>
-            ))}
-          </div>
-        }
-      />
+    <div className="flex gap-4">
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard label="Total Substations" value={formatNumber(total)} icon={Zap} />
-        <StatCard label="Loaded" value={formatNumber(substations.length)} />
-        <StatCard label="With Capacity" value={formatNumber(withCapacity)} />
-        <StatCard label="Areas" value={areaOptions.length} />
+      {/* Filter sidebar */}
+      <div className="w-56 shrink-0">
+        <FilterPanel onReset={reset} className="overflow-y-auto max-h-[calc(100vh-6rem)]">
+          <RadioFilter label="Map Style" value={tileStyle} onChange={setTileStyle} options={MAP_STYLE_OPTIONS} />
+          <SearchInput value={search} onChange={setSearch} placeholder="Code or name…" />
+          <SelectFilter label="Area" value={area} onChange={setArea} options={areaOptions} />
+        </FilterPanel>
       </div>
 
-      <div className="flex gap-4">
-        <div className="w-56 shrink-0">
-          <FilterPanel onReset={reset}>
-            <SearchInput value={search} onChange={setSearch} placeholder="Code or name..." />
-            <SelectFilter label="Area" value={area} onChange={setArea} options={areaOptions} />
-          </FilterPanel>
+      {/* Right column */}
+      <div className="flex-1 min-w-0 flex flex-col gap-3">
+
+        {/* KPI cards */}
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-white border border-slate-200 rounded-xl px-3 py-2.5 shadow-sm">
+            <p className="text-xs font-medium text-slate-500">Total Substations</p>
+            <p className="mt-1 text-xl font-semibold text-slate-900">
+              {loading ? "…" : formatNumber(total)}
+            </p>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-xl px-3 py-2.5 shadow-sm">
+            <p className="text-xs font-medium text-slate-500">Loaded</p>
+            <p className="mt-1 text-xl font-semibold text-slate-900">
+              {loading ? "…" : formatNumber(substations.length)}
+            </p>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-xl px-3 py-2.5 shadow-sm">
+            <p className="text-xs font-medium text-slate-500">With Capacity</p>
+            <p className="mt-1 text-xl font-semibold text-slate-900">
+              {loading ? "…" : formatNumber(withCapacity)}
+            </p>
+          </div>
         </div>
 
-        <div className="flex-1 min-w-0 space-y-4">
-          {viewMode !== "table" && (
-            <WellMap markers={markers} center={[53.5, -115.0]} zoom={5} height="420px" />
-          )}
-          {viewMode !== "map" && (
-            <DataTable
-              columns={COLUMNS}
-              data={substations}
-              keyField="id"
-              loading={loading}
-              emptyMessage="No substations match the current filters."
-            />
-          )}
+        {/* View toggle */}
+        <div className="flex gap-1 self-start rounded-lg border border-slate-200 bg-white p-1">
+          {VIEW_OPTIONS.map(({ value, label, icon }) => (
+            <button
+              key={value}
+              onClick={() => setViewMode(value)}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                viewMode === value
+                  ? "bg-emerald-600 text-white"
+                  : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              {icon}{label}
+            </button>
+          ))}
         </div>
+
+        {/* Map */}
+        {viewMode !== "table" && (
+          <WellMap
+            markers={markers}
+            center={[53.5, -115.0]}
+            zoom={5}
+            height={viewMode === "map" ? "calc(100vh - 18rem)" : "420px"}
+            tileStyle={tileStyle}
+          />
+        )}
+
+        {/* Table */}
+        {viewMode !== "map" && (
+          <DataTable
+            columns={COLUMNS}
+            data={substations}
+            keyField="id"
+            loading={loading}
+            emptyMessage="No substations match the current filters."
+          />
+        )}
       </div>
     </div>
   );
