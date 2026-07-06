@@ -1,4 +1,4 @@
-# Wellbore / Drilling Fluid Platform
+# Wellbore Inventory Platform
 
 Django + Django REST Framework backend, PostgreSQL/PostGIS database, and React frontend for well search, status filtering, formation filtering, maps, and well register views.
 
