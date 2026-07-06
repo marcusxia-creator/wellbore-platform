@@ -109,11 +109,11 @@ def inactive_activity_where(exists=True):
         WHERE well_production_summary.base_uwi = well_header.base_uwi
         AND (
         (
-            last_prod_yyyy_mm ~ '^[0-9]{4}/[0-9]{2}/[0-9]{2}$'
+            last_prod_yyyy_mm ~ '^[0-9]{{4}}/[0-9]{{2}}/[0-9]{{2}}$'
             AND to_date(last_prod_yyyy_mm, 'YYYY/MM/DD') < %s
         )
         OR (
-            last_inject_yyyy_mm ~ '^[0-9]{4}/[0-9]{2}/[0-9]{2}$'
+            last_inject_yyyy_mm ~ '^[0-9]{{4}}/[0-9]{{2}}/[0-9]{{2}}$'
             AND to_date(last_inject_yyyy_mm, 'YYYY/MM/DD') < %s
         )
         OR on_prod_yyyy_mm_dd < %s

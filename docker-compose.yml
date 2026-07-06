@@ -1,6 +1,7 @@
 services:
   db:
-    image: postgis/postgis:16-3.4
+    image: postgis/postgis:17-3.5
+    platform: linux/amd64
     profiles:
       - docker-db
     environment:
@@ -8,7 +9,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
-      - "5432:5432"
+      - "${DB_HOST_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -27,7 +28,7 @@ services:
       POSTGRES_HOST: ${POSTGRES_HOST:-host.docker.internal}
       POSTGRES_PORT: ${POSTGRES_PORT:-5432}
     ports:
-      - "8000:8000"
+      - "${BACKEND_HOST_PORT:-8000}:8000"
 
   frontend:
     build:
