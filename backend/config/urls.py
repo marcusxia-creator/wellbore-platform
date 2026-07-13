@@ -1,5 +1,10 @@
 from django.contrib import admin
 from django.urls import include, path
+from drf_spectacular.views import (
+    SpectacularAPIView,
+    SpectacularRedocView,
+    SpectacularSwaggerView,
+)
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
@@ -18,12 +23,8 @@ router.register("wells", WellViewSet, basename="well")
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("api/auth/login/", TokenObtainPairView.as_view(), name="auth-login"),
-    path("api/auth/refresh/", TokenRefreshView.as_view(), name="auth-refresh"),
-    path("api/auth/me/", me, name="auth-me"),
-    path("api/", include(router.urls)),
-    path("api/well-statuses/", well_statuses, name="well-statuses"),
-    path("api/actual-well-statuses/", actual_well_statuses, name="actual-well-statuses"),
-    path("api/well-types/", well_types, name="well-types"),
-    path("api/production-injection-formations/", production_injection_formations, name="production-injection-formations"),
+    path("api/", include("apps.wells.urls")),
+    path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
+    path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
+    path("api/redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
 ]

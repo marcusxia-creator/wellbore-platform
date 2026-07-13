@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from .models import WellCasing, WellHeader, WellProductionSummary
-from .status_rules import categorize_status, latest_activity_date
+from .services.well_status_service import categorize_status, latest_activity_date
 
 
 def parse_float(value):
