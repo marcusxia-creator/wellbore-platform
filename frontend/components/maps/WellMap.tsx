@@ -43,6 +43,7 @@ interface WellMapProps {
   selectedId?: number;
   tileStyle?: string;
   wellColorMode?: "status" | "volume";
+  radiusCircle?: { lat: number; lng: number; radiusMiles: number };
 }
 
 // ── GeoJSON builders ──────────────────────────────────────────────────────────
@@ -53,6 +54,7 @@ function buildGeoJSON(markers: MapMarker[], wellColorMode: "status" | "volume") 
   const sections: object[] = [];
   const wells: object[] = [];
   const substations: object[] = [];
+  const pins: object[] = [];
 
   let maxSecVol = 0;
   let maxWellVol = 0;
@@ -101,6 +103,13 @@ function buildGeoJSON(markers: MapMarker[], wellColorMode: "status" | "volume") 
         geometry: { type: "Point", coordinates: [s.longitude, s.latitude] },
         properties: { name: s.name, code: s.facility_code, capacityMw: s.capacity_mw },
       });
+    } else if (m.type === "pin") {
+      if (!m.lat || !m.lng) continue;
+      pins.push({
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [m.lng, m.lat] },
+        properties: { label: m.label ?? "" },
+      });
     } else if (m.type === "bestPoint") {
       const bp = m.data as BestPoint;
       wells.push({
@@ -115,6 +124,24 @@ function buildGeoJSON(markers: MapMarker[], wellColorMode: "status" | "volume") 
     sections:    { type: "FeatureCollection", features: sections    } as FC,
     wells:       { type: "FeatureCollection", features: wells       } as FC,
     substations: { type: "FeatureCollection", features: substations } as FC,
+    pins:        { type: "FeatureCollection", features: pins        } as FC,
+  };
+}
+
+// Approximate a radius (in miles) around a point as a 64-vertex GeoJSON polygon.
+function buildCircleGeoJSON(c?: { lat: number; lng: number; radiusMiles: number }): FC {
+  if (!c) return { type: "FeatureCollection", features: [] };
+  const degPerMile = 1 / 69.0; // ~69 miles per degree of latitude
+  const coords: [number, number][] = [];
+  for (let i = 0; i <= 64; i++) {
+    const theta = (i / 64) * 2 * Math.PI;
+    const dLat = c.radiusMiles * degPerMile * Math.sin(theta);
+    const dLng = (c.radiusMiles * degPerMile * Math.cos(theta)) / Math.cos((c.lat * Math.PI) / 180);
+    coords.push([c.lng + dLng, c.lat + dLat]);
+  }
+  return {
+    type: "FeatureCollection",
+    features: [{ type: "Feature", geometry: { type: "Polygon", coordinates: [coords] }, properties: {} }],
   };
 }
 
@@ -133,8 +160,21 @@ const VOL_STROKE = [
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function addSourcesAndLayers(map: any) {
   const empty: FC = { type: "FeatureCollection", features: [] };
-  for (const id of ["sections", "wells", "substations"])
+  for (const id of ["radius", "sections", "wells", "substations", "pins"])
     if (!map.getSource(id)) map.addSource(id, { type: "geojson", data: empty });
+
+  // Radius circle first so it renders beneath the markers.
+  if (!map.getLayer("radius-fill"))
+    map.addLayer({ id: "radius-fill", type: "fill", source: "radius", paint: {
+      "fill-color": "#10b981",
+      "fill-opacity": 0.08,
+    }});
+  if (!map.getLayer("radius-line"))
+    map.addLayer({ id: "radius-line", type: "line", source: "radius", paint: {
+      "line-color": "#059669",
+      "line-width": 2,
+      "line-dasharray": [2, 2],
+    }});
 
   if (!map.getLayer("sections-layer"))
     map.addLayer({ id: "sections-layer", type: "circle", source: "sections", paint: {
@@ -178,6 +218,16 @@ function addSourcesAndLayers(map: any) {
         "circle-stroke-width": 1,
         "circle-stroke-color": "white",
       } });
+
+  // Search-center pin on top of everything else
+  if (!map.getLayer("pins-layer"))
+    map.addLayer({ id: "pins-layer", type: "circle", source: "pins", paint: {
+      "circle-radius": 7,
+      "circle-color": "#2563eb",
+      "circle-opacity": 1,
+      "circle-stroke-width": 2,
+      "circle-stroke-color": "white",
+    }});
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -188,6 +238,14 @@ function setData(map: any, geojson: ReturnType<typeof buildGeoJSON>) {
   (map.getSource("wells")       as any)?.setData(geojson.wells);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (map.getSource("substations") as any)?.setData(geojson.substations);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (map.getSource("pins")        as any)?.setData(geojson.pins);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function setRadius(map: any, c?: { lat: number; lng: number; radiusMiles: number }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (map.getSource("radius") as any)?.setData(buildCircleGeoJSON(c));
 }
 
 // ── Popup helpers ─────────────────────────────────────────────────────────────
@@ -213,6 +271,7 @@ export default function WellMap({
   onSectionClick,
   tileStyle     = "basic",
   wellColorMode = "status",
+  radiusCircle,
 }: WellMapProps) {
   const containerRef   = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -221,9 +280,11 @@ export default function WellMap({
   const colorModeRef   = useRef(wellColorMode);
   const onSectionRef   = useRef(onSectionClick);
   const onMapClickRef  = useRef(onMapClick);
+  const radiusRef      = useRef(radiusCircle);
 
   useEffect(() => { markersRef.current   = markers;       }, [markers]);
   useEffect(() => { colorModeRef.current = wellColorMode; }, [wellColorMode]);
+  useEffect(() => { radiusRef.current    = radiusCircle;  }, [radiusCircle]);
   useEffect(() => { onSectionRef.current = onSectionClick;}, [onSectionClick]);
   useEffect(() => { onMapClickRef.current = onMapClick;   }, [onMapClick]);
 
@@ -255,6 +316,7 @@ export default function WellMap({
         map.resize();
         addSourcesAndLayers(map);
         setData(map, buildGeoJSON(markersRef.current, colorModeRef.current));
+        setRadius(map, radiusRef.current);
       });
 
       // Keep the canvas in sync if the container is resized later
@@ -314,11 +376,19 @@ export default function WellMap({
         map.resize();
         addSourcesAndLayers(map);
         setData(map, buildGeoJSON(markersRef.current, colorModeRef.current));
+        setRadius(map, radiusRef.current);
       };
       map.once("style.load", onLoad);
       return () => { map.off("style.load", onLoad); };
     }
   }, [markers, wellColorMode]);
+
+  // Update the search-radius circle when it changes
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return; // style.load handler covers the pending case
+    setRadius(map, radiusCircle);
+  }, [radiusCircle]);
 
   // Swap tile style
   useEffect(() => {

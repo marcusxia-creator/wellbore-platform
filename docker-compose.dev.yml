@@ -1,13 +1,15 @@
-# Development stack: Postgres + Django in Docker, frontend runs locally.
+# Development stack: Postgres + Django + Next.js, all in Docker.
 #
-#   docker compose -f docker-compose.dev.yml up          # start db + backend
+#   docker compose -f docker-compose.dev.yml up --build  # start db + backend + frontend
 #   docker compose -f docker-compose.dev.yml exec backend python manage.py migrate
 #   docker compose -f docker-compose.dev.yml exec backend python manage.py createsuperuser
 #
-# Then in ./frontend:  npm run dev  (http://localhost:3000)
+# Frontend: http://localhost:3000   Backend API: http://localhost:8000/api
 #
-# ./backend is bind-mounted, so Django's runserver hot-reloads on save —
-# no rebuild needed unless requirements.txt changes (then: --build).
+# ./backend and ./frontend are bind-mounted, so both hot-reload on save.
+# Rebuild (--build) only when requirements.txt or package-lock.json changes;
+# after a package-lock.json change also refresh the node_modules volume:
+#   docker volume rm wellbore-platform_frontend_node_modules
 
 services:
   db:
@@ -48,5 +50,28 @@ services:
       db:
         condition: service_healthy
 
+  frontend:
+    build:
+      context: .
+      dockerfile: deployment/frontend.dev.Dockerfile
+    environment:
+      # Browser-side requests go to the host-published backend port.
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api}
+      NEXT_PUBLIC_USE_MOCK: ${NEXT_PUBLIC_USE_MOCK:-false}
+      # File-watching on Windows/macOS bind mounts needs polling for hot reload.
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app/frontend
+      # Keep the image's Linux node_modules; never use the host's Windows one.
+      - frontend_node_modules:/app/frontend/node_modules
+      - frontend_next_cache:/app/frontend/.next
+    depends_on:
+      - backend
+
 volumes:
   postgres_data:
+  frontend_node_modules:
+  frontend_next_cache:
