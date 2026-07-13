@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useState, useSyncExternalStore } from "react";
 import {
   Zap,
   MapPin,
@@ -14,8 +14,12 @@ import {
   ChevronRight,
   Drill,
   Gauge,
+  LogOut,
+  UploadCloud,
+  Table2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getStoredUsername, logout } from "@/lib/auth";
 // Sidebar uses warm "stone" neutrals (not cool stone) to harmonize with the
 // page's warm cream background (#f8f7f2).
 
@@ -27,13 +31,32 @@ const NAV_ITEMS = [
   { href: "/well-ranking", label: "Well Ranking", icon: BarChart2 },
   { href: "/substation-ranking", label: "Substation Ranking", icon: Award },
   { href: "/substation-candidates", label: "Sub. Candidates", icon: PlusCircle },
+  { href: "/raw-data-import", label: "Raw Data Import", icon: UploadCloud },
+  { href: "/data-browser", label: "Data Browser", icon: Table2 },
 ] as const;
 
 const IS_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === "true";
 
+const subscribeNoop = () => () => {};
+const getServerUsername = () => null;
+
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
+
+  // Read from cookie client-side only (server snapshot is null) to avoid a
+  // server/client hydration mismatch.
+  const username = useSyncExternalStore(
+    subscribeNoop,
+    getStoredUsername,
+    getServerUsername
+  );
+
+  function handleLogout() {
+    logout();
+    router.replace("/login");
+  }
 
   return (
     <aside
@@ -107,8 +130,37 @@ export default function Sidebar() {
         </ul>
       </nav>
 
-      {/* Footer: status + collapse */}
+      {/* Footer: user + status + collapse */}
       <div className="border-t border-white/5 p-3">
+        {username && (
+          <div
+            className={cn(
+              "mb-1 flex items-center gap-2 rounded-lg px-2 py-1.5",
+              collapsed && "justify-center px-0"
+            )}
+            title={username}
+          >
+            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-emerald-500/15 text-[11px] font-semibold uppercase text-emerald-400">
+              {username.charAt(0)}
+            </span>
+            {!collapsed && (
+              <span className="truncate text-xs font-medium text-stone-300">
+                {username}
+              </span>
+            )}
+          </div>
+        )}
+        <button
+          onClick={handleLogout}
+          title={collapsed ? "Sign out" : undefined}
+          className={cn(
+            "mb-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-stone-400 transition-colors hover:bg-white/5 hover:text-stone-100",
+            collapsed && "justify-center px-0"
+          )}
+        >
+          <LogOut size={18} className="shrink-0" />
+          {!collapsed && <span>Sign out</span>}
+        </button>
         <div
           className={cn(
             "mb-2 flex items-center gap-2 px-2 text-[11px] text-stone-500",

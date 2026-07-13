@@ -16,11 +16,42 @@ import type {
   PaginatedResponse,
   FilterOption,
 } from "./types";
+import { getAccessToken, refreshAccessToken, logout } from "./auth";
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api",
   headers: { "Content-Type": "application/json" },
 });
+
+// Attach the JWT to every request.
+api.interceptors.request.use((config) => {
+  const token = getAccessToken();
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+// On 401, try one silent refresh + retry; otherwise send the user to /login.
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const original = error.config;
+    if (error.response?.status === 401 && original && !original._retried) {
+      original._retried = true;
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        original.headers.Authorization = `Bearer ${newToken}`;
+        return api(original);
+      }
+      logout();
+      if (typeof window !== "undefined") {
+        window.location.href = `/login?next=${encodeURIComponent(
+          window.location.pathname
+        )}`;
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 // ─── Wells ─────────────────────────────────────────────────────────────────
 
