@@ -1,11 +1,44 @@
+# Environment
 .env
+.env.local
+.env.*.local
+
+# Python
 .venv/
 __pycache__/
 *.py[cod]
+*.egg-info/
+build/
 db.sqlite3
+
+# Testing & linting caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Frontend
 node_modules/
 dist/
 .vite/
+
+# Editors
+.idea/
+*.log
 .DS_Store
+
+# Keep shared VS Code config, ignore the rest
+.vscode/*
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Generated OpenAPI schema (derived artifact; served live at /api/schema/)
+schema.yml
+schema.yaml
+openapi.json
+
+# Database dumps (never commit)
 database_dumps/
 *.dump
