@@ -4,12 +4,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
 import {
-  Zap,
-  MapPin,
-  Target,
-  BarChart2,
-  Award,
-  PlusCircle,
   ChevronLeft,
   ChevronRight,
   Drill,
@@ -25,12 +19,6 @@ import { getStoredUsername, logout } from "@/lib/auth";
 
 const NAV_ITEMS = [
   { href: "/wells", label: "Wells", icon: Drill },
-  { href: "/substations", label: "Substations", icon: Zap },
-  { href: "/nearby-wells", label: "Nearby Wells", icon: MapPin },
-  { href: "/best-point", label: "Best Point", icon: Target },
-  { href: "/well-ranking", label: "Well Ranking", icon: BarChart2 },
-  { href: "/substation-ranking", label: "Substation Ranking", icon: Award },
-  { href: "/substation-candidates", label: "Sub. Candidates", icon: PlusCircle },
   { href: "/raw-data-import", label: "Raw Data Import", icon: UploadCloud },
   { href: "/data-browser", label: "Data Browser", icon: Table2 },
 ] as const;

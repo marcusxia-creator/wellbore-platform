@@ -13,7 +13,11 @@
 
 services:
   db:
-    image: postgis/postgis:16-3.4
+    image: postgis/postgis:17-3.5
+    # Postgres uses /dev/shm for parallel-query hash/sort scratch space. Docker's
+    # 64MB default is too small for the wells DISTINCT-ON scans under concurrency
+    # (raises "could not resize shared memory segment / No space left on device").
+    shm_size: "256mb"
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-wellbore_db}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
