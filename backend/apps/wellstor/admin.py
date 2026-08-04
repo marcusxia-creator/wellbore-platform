@@ -1,6 +1,40 @@
 from django.contrib import admin
 
-from apps.wellstor.models import Substation, WellFeature, WellStorPrediction
+from apps.wellstor.models import (
+    RegionPrediction,
+    RegionRadiusResult,
+    Substation,
+    WellFeature,
+    WellStorPrediction,
+)
+
+
+@admin.register(RegionPrediction)
+class RegionPredictionAdmin(admin.ModelAdmin):
+    list_display = (
+        "substation",
+        "substation_candidate",
+        "suitable_probability",
+        "suitable_radius",
+        "well_count",
+        "good_count",
+    )
+    list_filter = ("substation_candidate",)
+    search_fields = ("substation__facility_code", "substation__facility_name")
+
+
+@admin.register(RegionRadiusResult)
+class RegionRadiusResultAdmin(admin.ModelAdmin):
+    list_display = (
+        "substation",
+        "radius_m",
+        "well_count",
+        "good_count",
+        "suitable_probability",
+        "substation_candidate",
+    )
+    list_filter = ("substation_candidate", "radius_m")
+    search_fields = ("substation__facility_code", "substation__facility_name")
 
 
 @admin.register(WellStorPrediction)
