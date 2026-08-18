@@ -20,13 +20,21 @@ class WellFeature(models.Model):
 
     # identity / land location
     user_format_well_id = models.TextField(blank=True, null=True)
-    uwi_suffix = models.SmallIntegerField(blank=True, null=True)
+    uwi_suffix = models.TextField(blank=True, null=True)  # event suffix; may be empty
     loc_exc_code = models.SmallIntegerField(blank=True, null=True)
     legal_subdivisions = models.SmallIntegerField(blank=True, null=True)
     section = models.SmallIntegerField(blank=True, null=True)
     township = models.SmallIntegerField(blank=True, null=True)
     range = models.SmallIntegerField(blank=True, null=True)
     meridian = models.SmallIntegerField(blank=True, null=True)
+    # BC NTS location parts (ATS wells leave these null)
+    nts_prefix = models.TextField(blank=True, null=True)
+    nts_quarter = models.TextField(blank=True, null=True)
+    nts_unit = models.TextField(blank=True, null=True)
+    nts_block = models.TextField(blank=True, null=True)
+    nts_series = models.TextField(blank=True, null=True)
+    nts_area = models.TextField(blank=True, null=True)
+    nts_sheet = models.TextField(blank=True, null=True)
     latitude = models.FloatField(blank=True, null=True)
     longitude = models.FloatField(blank=True, null=True)
     well_status_text = models.TextField(blank=True, null=True)
@@ -43,6 +51,9 @@ class WellFeature(models.Model):
     deepest_casing_size = models.FloatField(blank=True, null=True)
     deepest_casing_weight = models.FloatField(blank=True, null=True)
     deepest_casing_grade = models.TextField(blank=True, null=True)
+    deepest_casing_id = models.FloatField(blank=True, null=True)  # inner diameter, mm
+    liner_start_m = models.FloatField(blank=True, null=True)
+    liner_end_m = models.FloatField(blank=True, null=True)
 
     # geometry
     md_all_wells = models.FloatField(blank=True, null=True)
@@ -53,6 +64,7 @@ class WellFeature(models.Model):
     months_since_last_prod = models.IntegerField(blank=True, null=True)
     months_since_last_inj = models.IntegerField(blank=True, null=True)
     idle_well_flag = models.BooleanField(blank=True, null=True)
+    wellstor_flag = models.BooleanField(blank=True, null=True)  # susp/abd status or idle
 
     # volume / pressure (core model features)
     depth_for_available_volume = models.FloatField(blank=True, null=True)

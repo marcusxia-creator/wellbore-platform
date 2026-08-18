@@ -9,8 +9,10 @@ class WellFeatureFactory(factory.django.DjangoModelFactory):
         model = WellFeature
 
     base_uwi = factory.Sequence(lambda n: f"UWI-{n:06d}")
+    uwi_suffix = ""
     latitude = 55.0
     longitude = -114.0
+    wellstor_flag = True
     perforation_type = PerforationType.PERF
     deepest_casing_type = DeepestCasingType.PRODUCTION
     normalized_available_volume = 100.0

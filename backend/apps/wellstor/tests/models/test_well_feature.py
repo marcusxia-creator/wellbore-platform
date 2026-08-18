@@ -37,3 +37,25 @@ class TestWellFeature:
     def test_str(self):
         feature = WellFeatureFactory(base_uwi="UWI-X")
         assert str(feature) == "UWI-X feature"
+
+    def test_preprocessing_fields_persist(self):
+        feature = WellFeatureFactory(
+            base_uwi="UWI-P",
+            uwi_suffix="00",
+            nts_prefix="A",
+            nts_area="93",
+            nts_sheet="A",
+            deepest_casing_id=159.4,
+            liner_start_m=1200.0,
+            liner_end_m=1800.0,
+            wellstor_flag=True,
+        )
+        stored = WellFeature.objects.get(base_uwi="UWI-P")
+        assert stored.uwi_suffix == "00"
+        assert stored.nts_prefix == "A"
+        assert stored.nts_area == "93"
+        assert stored.nts_sheet == "A"
+        assert stored.deepest_casing_id == 159.4
+        assert stored.liner_start_m == 1200.0
+        assert stored.liner_end_m == 1800.0
+        assert stored.wellstor_flag is True
