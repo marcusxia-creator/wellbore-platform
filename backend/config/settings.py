@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "corsheaders",
     "apps.wells",
+    "apps.wellstor",
     "apps.casing",
     "apps.inventory",
     "apps.costs",
