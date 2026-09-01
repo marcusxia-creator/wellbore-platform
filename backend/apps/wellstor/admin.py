@@ -1,6 +1,12 @@
 from django.contrib import admin
 
-from apps.wellstor.models import WellFeature
+from apps.wellstor.models import Substation, WellFeature
+
+
+@admin.register(Substation)
+class SubstationAdmin(admin.ModelAdmin):
+    list_display = ("facility_code", "facility_name", "latitude", "longitude", "capacity_mw")
+    search_fields = ("facility_code", "facility_name")
 
 
 @admin.register(WellFeature)
