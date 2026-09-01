@@ -1,6 +1,20 @@
 from django.contrib import admin
 
-from apps.wellstor.models import Substation, WellFeature
+from apps.wellstor.models import Substation, WellFeature, WellStorPrediction
+
+
+@admin.register(WellStorPrediction)
+class WellStorPredictionAdmin(admin.ModelAdmin):
+    list_display = (
+        "base_uwi",
+        "nearest_substation",
+        "distance_m",
+        "good_probability",
+        "wellstore_candidate",
+        "radius_m",
+    )
+    list_filter = ("wellstore_candidate", "radius_m")
+    search_fields = ("base_uwi",)
 
 
 @admin.register(Substation)
