@@ -5,9 +5,18 @@ Holds all database mutations, keeping them separate from the read layer in
 functions instead of writing SQL inline, enforcing a clear read/write split
 (`queries.py` for reads, `writes.py` for writes).
 
-The only writable tables in this app are the derived cache tables
-`well_status_category` and `well_production_formation`; every other table is an
-unmanaged read-only legacy table.
+Writable (Django-managed) cache tables
+---------------------------------------
+* well_status_category       — derived status category per well
+* well_production_formation  — one row per (well, formation) from prod summary
+* well_current_operator      — most-recent operator per well
+
+Every other table in this app is an unmanaged read-only legacy table.
+
+Calling convention
+------------------
+All public functions return a simple value (int or tuple[int, ...]) indicating
+how many rows were written so that management commands can log progress.
 """
 
 from django.db import connection
@@ -20,8 +29,14 @@ def refresh_well_status_categories() -> int:
     """Populate the well_status_category cache table from source tables.
 
     Clears the table and fills it in a single statement, using the 24-month
-    activity cutoff to derive each well's status category. Returns the number of
-    rows written.
+    activity cutoff to derive each well's status category. Returns the number
+    of rows written.
+
+    Status logic (matches well_status_service.categorize_status):
+        1. status text contains 'abd'  → ABD
+        2. status text contains 'susp' → Suspended
+        3. last activity < 24 months ago → Inactive
+        4. otherwise → Active
     """
     cutoff = cutoff_24_months()
 
@@ -111,7 +126,7 @@ def refresh_well_production_formations() -> tuple[int, int]:
     """Populate the well_production_formation cache table from source tables.
 
     Clears the table and fills it by splitting each well's `prod_inject_frmtn`
-    value on `;` into individual formation rows. Returns a tuple of
+    value on ';' into individual formation rows. Returns a tuple of
     (mapping row count, distinct formation count).
     """
     sql = """
@@ -164,3 +179,75 @@ def refresh_well_production_formations() -> tuple[int, int]:
         formation_count = cursor.fetchone()[0]
 
     return mapping_count, formation_count
+
+
+def refresh_well_current_operators() -> int:
+    """Populate the well_current_operator cache table from source tables.
+
+    For each unique base_uwi, picks the single most-recent operator name by
+    choosing the row with the highest suffix (then raw_id) from well_status.
+    Falls back to well_header.cur_operator_name when well_status has no
+    cur_operator_name, so the cache is always populated even on sparse data.
+
+    Returns the number of rows written.
+
+    Why a separate cache table?
+    ---------------------------
+    The operator dropdown on the dashboard/production map requires fast
+    DISTINCT queries over potentially tens of thousands of wells. A cache table
+    with a dedicated index is significantly faster than scanning well_status at
+    request time, and keeps the query layer clean (no inline CTEs in views).
+    """
+    sql = """
+    TRUNCATE TABLE well_current_operator;
+
+    INSERT INTO well_current_operator (
+        base_uwi,
+        operator_name,
+        suffix,
+        raw_id,
+        refreshed_at
+    )
+    WITH selected_header AS (
+        -- Canonical well list: one row per base_uwi (latest suffix/raw_id).
+        SELECT DISTINCT ON (base_uwi)
+            base_uwi,
+            suffix,
+            raw_id,
+            cur_operator_name AS header_operator_name
+        FROM well_header
+        WHERE base_uwi IS NOT NULL
+        ORDER BY base_uwi, suffix DESC NULLS LAST, raw_id DESC NULLS LAST
+    ),
+    latest_status AS (
+        -- Most-recent operator name from well_status per base_uwi.
+        SELECT DISTINCT ON (base_uwi)
+            base_uwi,
+            suffix,
+            raw_id,
+            cur_operator_name AS status_operator_name
+        FROM well_status
+        WHERE base_uwi IS NOT NULL
+        ORDER BY base_uwi, suffix DESC NULLS LAST, raw_id DESC NULLS LAST
+    )
+    SELECT
+        h.base_uwi,
+        -- Prefer the status table; fall back to well_header if status has none.
+        COALESCE(
+            NULLIF(btrim(s.status_operator_name), ''),
+            NULLIF(btrim(h.header_operator_name), ''),
+            'Unknown'
+        ) AS operator_name,
+        COALESCE(s.suffix, h.suffix)   AS suffix,
+        COALESCE(s.raw_id, h.raw_id)   AS raw_id,
+        %s AS refreshed_at
+    FROM selected_header h
+    LEFT JOIN latest_status s ON s.base_uwi = h.base_uwi;
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(sql, [timezone.now()])
+        cursor.execute("SELECT COUNT(*) FROM well_current_operator")
+        count = cursor.fetchone()[0]
+
+    return count
