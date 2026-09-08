@@ -2,6 +2,7 @@ import factory
 
 from apps.wells.models import (
     WellCasing,
+    WellCurrentOperator,
     WellDrilling,
     WellHeader,
     WellLocation,
@@ -46,6 +47,8 @@ class WellStatusFactory(factory.django.DjangoModelFactory):
     base_uwi = factory.SubFactory(WellHeaderFactory)
     well_status_text = "Flowing"
     well_status_abrv = "FL"
+    cur_operator_name = "Test Operator"
+    well_type = "OIL"
     suffix = "00"
 
 
@@ -103,3 +106,13 @@ class WellProductionFormationFactory(factory.django.DjangoModelFactory):
     formation = "Cardium"
     source_value = "Cardium"
     suffix = "00"
+
+
+class WellCurrentOperatorFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = WellCurrentOperator
+
+    base_uwi = factory.Sequence(lambda n: f"UWI-{n:06d}")
+    operator_name = "Test Operator"
+    suffix = "00"
+    raw_id = factory.Sequence(lambda n: n + 1)
