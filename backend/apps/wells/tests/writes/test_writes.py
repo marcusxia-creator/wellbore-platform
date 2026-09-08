@@ -194,7 +194,9 @@ class TestRefreshWellCurrentOperators:
         count_first = WellCurrentOperator.objects.count()
 
         writes.refresh_well_current_operators()
-        assert WellCurrentOperator.objects.count() == count_first
+        count_second = WellCurrentOperator.objects.count()
+
+        assert count_first == count_second
 
     @pytest.mark.parametrize(
         "operator_name",
