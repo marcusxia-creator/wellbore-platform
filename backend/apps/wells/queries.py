@@ -28,6 +28,7 @@ from apps.wells.models import (
     ProductionMonthly,
     WellCurrentOperator,
     WellHeader,
+    WellLocation,
     WellProductionFormation,
     WellStatus,
     WellStatusCategory,
@@ -275,3 +276,137 @@ class MetadataQueries:
         if search:
             qs = qs.filter(cur_operator_name__icontains=search)
         return qs.order_by("cur_operator_name").values_list("cur_operator_name", flat=True).distinct()
+
+
+# ---------------------------------------------------------------------------
+# ProductionQueries
+# ---------------------------------------------------------------------------
+
+class ProductionQueries:
+    """Read-only queries for production data (map bubbles + daily plot).
+
+    All methods that touch production_daily / production_monthly guard against
+    the tables not existing yet via _table_exists(), returning empty results
+    on fresh deployments rather than raising exceptions.
+    """
+
+    @staticmethod
+    def get_daily_production(base_uwi: str) -> list[dict]:
+        """Return daily production rows for a single well, ordered by date.
+
+        Each row is a plain dict with keys:
+            date          – ISO date string (YYYY-MM-DD)
+            daily_oil     – float (bbls)
+            daily_water   – float (bbls)
+            daily_gas     – float (MCF)
+            fluid         – float (bbls)
+
+        Returns an empty list when the production_daily table does not exist
+        or the well has no rows.
+        """
+        if not _table_exists("production_daily"):
+            return []
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    production_date,
+                    daily_oil,
+                    daily_water,
+                    daily_gas,
+                    fluid
+                FROM production_daily
+                WHERE base_uwi = %s
+                ORDER BY production_date ASC
+                """,
+                [base_uwi],
+            )
+            return [
+                {
+                    "date": row[0].isoformat(),
+                    "daily_oil": float(row[1] or 0),
+                    "daily_water": float(row[2] or 0),
+                    "daily_gas": float(row[3] or 0),
+                    "fluid": float(row[4] or 0),
+                }
+                for row in cursor.fetchall()
+            ]
+
+    @staticmethod
+    def get_mapped_wells_queryset(
+        operator_name: list[str] | None = None,
+    ) -> QuerySet:
+        """Return an annotated queryset restricted to wells that have coordinates.
+
+        Used by the production map to build the bubble layer. Starts from the
+        same full annotation base as WellQueries.get_annotated_queryset() so
+        the serializer can read operator, cumulative volumes, and formations
+        without extra queries.
+
+        The `operator_name` filter is the primary filter on the production map
+        (default: Saguaro Petroleum LLC). Pass None to return all mapped wells.
+
+        Only wells whose *latest* location row has a non-null latitude AND
+        longitude are included — unmapped wells cannot be placed on the map.
+        """
+        # UWIs that have at least one location with both lat and lon.
+        mapped_uwis = (
+            WellLocation.objects.exclude(latitude__isnull=True)
+            .exclude(longitude__isnull=True)
+            .values_list("base_uwi", flat=True)
+            .distinct()
+        )
+
+        queryset = (
+            WellQueries.get_annotated_queryset()
+            .filter(base_uwi__in=mapped_uwis)
+        )
+
+        if operator_name:
+            queryset = WellQueries.filter_wells(
+                queryset, operator_name=operator_name
+            )
+
+        return queryset
+
+    @staticmethod
+    def get_production_totals(base_uwi: str) -> dict:
+        """Return cumulative production totals for a single well.
+
+        Reads the latest row from production_monthly (highest production_month)
+        which already carries running cumulative columns. Returns a dict with:
+            cumulative_oil   – float or None
+            cumulative_water – float or None
+            cumulative_gas   – float or None
+            cumulative_fluid – float or None
+
+        Returns all-None dict when production_monthly is absent or the well
+        has no rows.
+        """
+        empty = {
+            "cumulative_oil": None,
+            "cumulative_water": None,
+            "cumulative_gas": None,
+            "cumulative_fluid": None,
+        }
+
+        if not _table_exists("production_monthly"):
+            return empty
+
+        row = (
+            ProductionMonthly.objects.filter(base_uwi=base_uwi)
+            .order_by("-production_month")
+            .values("cumulative_oil", "cumulative_water", "cumulative_gas", "cumulative_fluid")
+            .first()
+        )
+
+        if row is None:
+            return empty
+
+        return {
+            "cumulative_oil": row["cumulative_oil"],
+            "cumulative_water": row["cumulative_water"],
+            "cumulative_gas": row["cumulative_gas"],
+            "cumulative_fluid": row["cumulative_fluid"],
+        }
