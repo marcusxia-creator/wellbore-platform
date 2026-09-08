@@ -1,5 +1,6 @@
 from .wells import (
     WellCasingFactory,
+    WellCurrentOperatorFactory,
     WellDrillingFactory,
     WellHeaderFactory,
     WellLocationFactory,
@@ -11,6 +12,7 @@ from .wells import (
 
 __all__ = [
     "WellCasingFactory",
+    "WellCurrentOperatorFactory",
     "WellDrillingFactory",
     "WellHeaderFactory",
     "WellLocationFactory",
