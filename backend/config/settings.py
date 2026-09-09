@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "apps.wells",
     "apps.wellstor",
+    "apps.data_browser",
     "apps.casing",
     "apps.inventory",
     "apps.costs",
