@@ -361,3 +361,102 @@ def rebuild_production_monthly(base_uwis: list[str] | None = None) -> int:
         count = cursor.fetchone()[0]
 
     return count
+
+
+def rebuild_injection_monthly(base_uwis: list[str] | None = None) -> int:
+    """Rebuild injection_monthly from injection_daily for the given wells.
+
+    Aggregates daily rows into monthly buckets and computes running cumulative
+    totals using SQL window functions (water, gas, steam). Deletes existing
+    monthly rows for the affected wells before re-inserting so that corrected
+    daily data is fully reflected.
+
+    Parameters
+    ----------
+    base_uwis:
+        Optional list of UWIs to rebuild. When None, rebuilds every well that
+        has rows in injection_daily (full refresh).
+
+    Returns
+    -------
+    int
+        Number of rows written to injection_monthly.
+
+    Notes
+    -----
+    This function intentionally does NOT truncate injection_monthly globally —
+    it only touches the rows for the supplied (or all) base_uwis so that a
+    partial rebuild for one well does not destroy data for others.
+    """
+    sql_all_uwis = """
+    SELECT DISTINCT base_uwi FROM injection_daily
+    """
+    sql_delete = """
+    DELETE FROM injection_monthly WHERE base_uwi = ANY(%s)
+    """
+    sql_insert = """
+    INSERT INTO injection_monthly (
+        base_uwi,
+        injection_month,
+        monthly_water,
+        monthly_gas,
+        monthly_steam,
+        cumulative_water,
+        cumulative_gas,
+        cumulative_steam,
+        updated_at
+    )
+    WITH monthly AS (
+        SELECT
+            base_uwi,
+            date_trunc('month', injection_date)::date  AS injection_month,
+            SUM(daily_water)                           AS monthly_water,
+            SUM(daily_gas)                             AS monthly_gas,
+            SUM(daily_steam)                           AS monthly_steam
+        FROM injection_daily
+        WHERE base_uwi = ANY(%s)
+        GROUP BY base_uwi, date_trunc('month', injection_date)::date
+    )
+    SELECT
+        base_uwi,
+        injection_month,
+        monthly_water,
+        monthly_gas,
+        monthly_steam,
+        SUM(monthly_water) OVER (PARTITION BY base_uwi ORDER BY injection_month)
+            AS cumulative_water,
+        SUM(monthly_gas)   OVER (PARTITION BY base_uwi ORDER BY injection_month)
+            AS cumulative_gas,
+        SUM(monthly_steam) OVER (PARTITION BY base_uwi ORDER BY injection_month)
+            AS cumulative_steam,
+        %s AS updated_at
+    FROM monthly
+    ORDER BY base_uwi, injection_month
+    ON CONFLICT (base_uwi, injection_month) DO UPDATE SET
+        monthly_water    = EXCLUDED.monthly_water,
+        monthly_gas      = EXCLUDED.monthly_gas,
+        monthly_steam    = EXCLUDED.monthly_steam,
+        cumulative_water = EXCLUDED.cumulative_water,
+        cumulative_gas   = EXCLUDED.cumulative_gas,
+        cumulative_steam = EXCLUDED.cumulative_steam,
+        updated_at       = EXCLUDED.updated_at
+    """
+
+    with connection.cursor() as cursor:
+        # Resolve target UWIs when not supplied by caller.
+        if base_uwis is None:
+            cursor.execute(sql_all_uwis)
+            base_uwis = [row[0] for row in cursor.fetchall()]
+
+        if not base_uwis:
+            return 0
+
+        cursor.execute(sql_delete, [base_uwis])
+        cursor.execute(sql_insert, [base_uwis, timezone.now()])
+        cursor.execute(
+            "SELECT COUNT(*) FROM injection_monthly WHERE base_uwi = ANY(%s)",
+            [base_uwis],
+        )
+        count = cursor.fetchone()[0]
+
+    return count
