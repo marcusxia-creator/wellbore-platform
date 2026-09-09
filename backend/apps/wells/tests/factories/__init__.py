@@ -1,4 +1,6 @@
 from .wells import (
+    InjectionDailyFactory,
+    InjectionMonthlyFactory,
     WellCasingFactory,
     WellCurrentOperatorFactory,
     WellDrillingFactory,
@@ -11,6 +13,8 @@ from .wells import (
 )
 
 __all__ = [
+    "InjectionDailyFactory",
+    "InjectionMonthlyFactory",
     "WellCasingFactory",
     "WellCurrentOperatorFactory",
     "WellDrillingFactory",

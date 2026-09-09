@@ -1,6 +1,8 @@
 import factory
 
 from apps.wells.models import (
+    InjectionDaily,
+    InjectionMonthly,
     WellCasing,
     WellCurrentOperator,
     WellDrilling,
@@ -116,3 +118,44 @@ class WellCurrentOperatorFactory(factory.django.DjangoModelFactory):
     operator_name = "Test Operator"
     suffix = "00"
     raw_id = factory.Sequence(lambda n: n + 1)
+
+
+class InjectionDailyFactory(factory.django.DjangoModelFactory):
+    """Factory for injection_daily rows.
+
+    The underlying table is unmanaged (created by the import pipeline), so
+    tests that use this factory must ensure the table exists — typically by
+    running with @pytest.mark.django_db(transaction=True) against a real DB
+    that has been seeded with the injection schema.
+    """
+
+    class Meta:
+        model = InjectionDaily
+
+    base_uwi = factory.Sequence(lambda n: f"UWI-{n:06d}")
+    injection_date = factory.Sequence(lambda n: f"2024-{(n % 12) + 1:02d}-01")
+    daily_water = 10.0
+    daily_gas = 5.0
+    daily_steam = 0.0
+    injection_pressure = 500.0
+    source_file = "test_import.xlsx"
+
+
+class InjectionMonthlyFactory(factory.django.DjangoModelFactory):
+    """Factory for injection_monthly rows.
+
+    The table is unmanaged — see InjectionDailyFactory docstring for the
+    same caveat about table existence in tests.
+    """
+
+    class Meta:
+        model = InjectionMonthly
+
+    base_uwi = factory.Sequence(lambda n: f"UWI-{n:06d}")
+    injection_month = factory.Sequence(lambda n: f"2024-{(n % 12) + 1:02d}-01")
+    monthly_water = 300.0
+    monthly_gas = 150.0
+    monthly_steam = 0.0
+    cumulative_water = 300.0
+    cumulative_gas = 150.0
+    cumulative_steam = 0.0
