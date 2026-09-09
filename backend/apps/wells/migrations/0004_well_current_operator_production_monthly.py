@@ -28,9 +28,10 @@ class Migration(migrations.Migration):
                 ],
             },
         ),
-        # ProductionMonthly: unmanaged (managed=False) — Django registers the
-        # model for ORM access but never creates or drops the table itself.
-        # The table is owned by the data-import pipeline (apps.data_imports).
+        # ProductionMonthly: Django-managed table. Rows are rebuilt from
+        # production_daily by writes.rebuild_production_monthly(). Using
+        # managed=True so that `migrate` creates the table automatically on
+        # fresh deployments without needing the import pipeline to run first.
         migrations.CreateModel(
             name="ProductionMonthly",
             fields=[
@@ -50,7 +51,7 @@ class Migration(migrations.Migration):
             options={
                 "db_table": "production_monthly",
                 "ordering": ["base_uwi", "-production_month"],
-                "managed": False,
+                "unique_together": {("base_uwi", "production_month")},
             },
         ),
     ]

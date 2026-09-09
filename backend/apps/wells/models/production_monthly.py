@@ -26,9 +26,9 @@ class ProductionMonthly(models.Model):
     updated_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
-        managed = False
         db_table = "production_monthly"
         ordering = ["base_uwi", "-production_month"]
+        unique_together = [("base_uwi", "production_month")]
 
     def __str__(self):
         return f"{self.base_uwi} {self.production_month}"
