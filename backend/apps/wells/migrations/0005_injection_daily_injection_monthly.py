@@ -7,9 +7,9 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        # InjectionDaily: unmanaged (managed=False) — Django registers the
-        # model for ORM access but never creates or drops the table.
-        # The table is owned by the data-import pipeline (apps.data_imports).
+        # InjectionDaily: Django-managed table. Using managed=True so that
+        # `migrate` creates the table on fresh deployments. Rows are populated
+        # by the data-import pipeline or direct SQL inserts.
         migrations.CreateModel(
             name="InjectionDaily",
             fields=[
@@ -26,12 +26,12 @@ class Migration(migrations.Migration):
             options={
                 "db_table": "injection_daily",
                 "ordering": ["base_uwi", "injection_date"],
-                "managed": False,
+                "unique_together": {("base_uwi", "injection_date")},
             },
         ),
-        # InjectionMonthly: unmanaged (managed=False) — same ownership rules
-        # as InjectionDaily. Monthly rows are aggregated by the import pipeline
-        # using SQL window functions.
+        # InjectionMonthly: Django-managed table. Monthly rows are aggregated
+        # from injection_daily by the import pipeline or writes functions.
+        # Using managed=True so `migrate` creates the table automatically.
         migrations.CreateModel(
             name="InjectionMonthly",
             fields=[
@@ -49,7 +49,7 @@ class Migration(migrations.Migration):
             options={
                 "db_table": "injection_monthly",
                 "ordering": ["base_uwi", "-injection_month"],
-                "managed": False,
+                "unique_together": {("base_uwi", "injection_month")},
             },
         ),
     ]

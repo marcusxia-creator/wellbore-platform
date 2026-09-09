@@ -2,15 +2,13 @@ from django.db import models
 
 
 class InjectionMonthly(models.Model):
-    """Unmanaged model for the injection_monthly table.
+    """Django-managed model for the injection_monthly table.
 
-    The table is created and owned by the data-import pipeline
-    (apps.data_imports). Django never creates or drops it; this model exists
-    only to give the ORM and queries.py typed access to the rows.
-
-    Monthly rows are aggregated from injection_daily by the import pipeline.
-    The cumulative_* columns are running totals computed with SQL window
-    functions (SUM OVER PARTITION BY base_uwi ORDER BY injection_month).
+    The table is created by Django migrations (managed=True). Monthly rows
+    are aggregated from injection_daily by the data-import pipeline or
+    writes functions. The cumulative_* columns are running totals computed
+    with SQL window functions (SUM OVER PARTITION BY base_uwi ORDER BY
+    injection_month).
 
     Schema (created by ensure_injection_tables in data_imports/services.py):
         base_uwi          text NOT NULL
@@ -36,7 +34,6 @@ class InjectionMonthly(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        managed = False
         db_table = "injection_monthly"
         ordering = ["base_uwi", "-injection_month"]
         unique_together = [("base_uwi", "injection_month")]

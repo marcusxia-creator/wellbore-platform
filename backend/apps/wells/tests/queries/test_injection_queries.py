@@ -1,10 +1,10 @@
 """Integration tests for InjectionQueries (queries.py).
 
 These tests run against a real PostgreSQL test database. The injection_daily
-and injection_monthly tables are unmanaged (owned by the import pipeline), so
-the conftest must create them before these tests run. All raw INSERT statements
-use django.db.connection.cursor() directly because the tables are unmanaged and
-Factory Boy cannot create rows without the table existing.
+and injection_monthly tables are Django-managed (managed=True), so the test
+runner creates them automatically via migrations. Raw INSERT statements use
+django.db.connection.cursor() directly for speed and to avoid factory
+overhead on bulk fixture data.
 """
 
 import pytest
@@ -23,42 +23,8 @@ pytestmark = pytest.mark.django_db
 
 
 # ---------------------------------------------------------------------------
-# Helpers — raw SQL fixtures for unmanaged tables
+# Helpers — raw SQL row insertion for managed tables
 # ---------------------------------------------------------------------------
-
-def _create_injection_tables():
-    """Ensure injection_daily and injection_monthly tables exist in the test DB."""
-    with connection.cursor() as cur:
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS injection_daily (
-                id              bigserial PRIMARY KEY,
-                base_uwi        text NOT NULL,
-                injection_date  date NOT NULL,
-                daily_water     double precision NOT NULL DEFAULT 0,
-                daily_gas       double precision NOT NULL DEFAULT 0,
-                daily_steam     double precision NOT NULL DEFAULT 0,
-                injection_pressure double precision NOT NULL DEFAULT 0,
-                source_file     text,
-                imported_at     timestamptz NOT NULL DEFAULT now(),
-                UNIQUE (base_uwi, injection_date)
-            )
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS injection_monthly (
-                id              bigserial PRIMARY KEY,
-                base_uwi        text NOT NULL,
-                injection_month date NOT NULL,
-                monthly_water   double precision NOT NULL DEFAULT 0,
-                monthly_gas     double precision NOT NULL DEFAULT 0,
-                monthly_steam   double precision NOT NULL DEFAULT 0,
-                cumulative_water double precision NOT NULL DEFAULT 0,
-                cumulative_gas  double precision NOT NULL DEFAULT 0,
-                cumulative_steam double precision NOT NULL DEFAULT 0,
-                updated_at      timestamptz NOT NULL DEFAULT now(),
-                UNIQUE (base_uwi, injection_month)
-            )
-        """)
-
 
 def _insert_daily(base_uwi, rows):
     """Insert rows into injection_daily. Each row is (date_str, water, gas, steam, pressure)."""
@@ -94,8 +60,11 @@ def _insert_monthly(base_uwi, rows):
 
 @pytest.fixture(autouse=True)
 def injection_tables(db):
-    """Create injection tables once per test session if they do not exist."""
-    _create_injection_tables()
+    """injection_daily and injection_monthly are managed=True so Django's test
+    runner creates them automatically via migrations. No-op fixture kept for
+    explicitness.
+    """
+    pass
 
 
 # ---------------------------------------------------------------------------
