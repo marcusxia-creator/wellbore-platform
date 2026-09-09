@@ -2,11 +2,10 @@ from django.db import models
 
 
 class InjectionDaily(models.Model):
-    """Unmanaged model for the injection_daily table.
+    """Django-managed model for the injection_daily table.
 
-    The table is created and owned by the data-import pipeline
-    (apps.data_imports). Django never creates or drops it; this model exists
-    only to give the ORM and queries.py typed access to the rows.
+    The table is created by Django migrations (managed=True). Rows are
+    populated by the data-import pipeline or direct SQL inserts in writes.py.
 
     Schema (created by ensure_injection_tables in data_imports/services.py):
         base_uwi          text NOT NULL
@@ -30,7 +29,6 @@ class InjectionDaily(models.Model):
     imported_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        managed = False
         db_table = "injection_daily"
         ordering = ["base_uwi", "injection_date"]
         unique_together = [("base_uwi", "injection_date")]

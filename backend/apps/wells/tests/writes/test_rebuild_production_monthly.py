@@ -22,8 +22,11 @@ pytestmark = pytest.mark.django_db(transaction=True)
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(autouse=True)
-def production_tables():
-    """Create production_daily and production_monthly if they do not exist."""
+def production_tables(db):
+    """production_monthly is managed=True so Django's test runner creates it
+    automatically via migrations. production_daily is not yet managed by
+    Django migrations, so we create it here if absent.
+    """
     with connection.cursor() as cur:
         cur.execute("""
             CREATE TABLE IF NOT EXISTS production_daily (
@@ -36,23 +39,6 @@ def production_tables():
                 fluid           double precision,
                 imported_at     timestamptz NOT NULL DEFAULT now(),
                 UNIQUE (base_uwi, production_date)
-            )
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS production_monthly (
-                id               bigserial PRIMARY KEY,
-                base_uwi         text NOT NULL,
-                production_month date NOT NULL,
-                monthly_oil      double precision,
-                monthly_water    double precision,
-                monthly_gas      double precision,
-                monthly_fluid    double precision,
-                cumulative_oil   double precision,
-                cumulative_water double precision,
-                cumulative_gas   double precision,
-                cumulative_fluid double precision,
-                updated_at       timestamptz NOT NULL DEFAULT now(),
-                UNIQUE (base_uwi, production_month)
             )
         """)
 
