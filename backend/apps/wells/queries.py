@@ -25,6 +25,7 @@ from django.db import connection
 from django.db.models import FloatField, OuterRef, Q, QuerySet, Subquery, TextField, Value
 
 from apps.wells.models import (
+    InjectionMonthly,
     ProductionMonthly,
     WellCurrentOperator,
     WellHeader,
@@ -410,3 +411,141 @@ class ProductionQueries:
             "cumulative_gas": row["cumulative_gas"],
             "cumulative_fluid": row["cumulative_fluid"],
         }
+
+
+# ---------------------------------------------------------------------------
+# InjectionQueries
+# ---------------------------------------------------------------------------
+
+class InjectionQueries:
+    """Read-only queries for injection data (daily plot + cumulative totals).
+
+    All methods guard against the injection tables not yet existing (they are
+    created by the data-import pipeline on first injection upload), returning
+    safe empty values instead of raising exceptions.
+    """
+
+    @staticmethod
+    def get_daily_injection(base_uwi: str) -> list[dict]:
+        """Return daily injection rows for a single well, ordered by date.
+
+        Each row is a plain dict with keys:
+            date               – ISO date string (YYYY-MM-DD)
+            daily_water        – float (m³)
+            daily_gas          – float (e³m³)
+            daily_steam        – float (m³)
+            injection_pressure – float (kPa)
+
+        Returns an empty list when the injection_daily table does not exist
+        or the well has no rows.
+        """
+        if not _table_exists("injection_daily"):
+            return []
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    injection_date,
+                    daily_water,
+                    daily_gas,
+                    daily_steam,
+                    injection_pressure
+                FROM injection_daily
+                WHERE base_uwi = %s
+                ORDER BY injection_date ASC
+                """,
+                [base_uwi],
+            )
+            return [
+                {
+                    "date": row[0].isoformat(),
+                    "daily_water": float(row[1] or 0),
+                    "daily_gas": float(row[2] or 0),
+                    "daily_steam": float(row[3] or 0),
+                    "injection_pressure": float(row[4] or 0),
+                }
+                for row in cursor.fetchall()
+            ]
+
+    @staticmethod
+    def get_injection_totals(base_uwi: str) -> dict:
+        """Return cumulative injection totals for a single well.
+
+        Reads the latest row from injection_monthly (highest injection_month),
+        which already carries running cumulative columns. Returns a dict with:
+            cumulative_water  – float or None
+            cumulative_gas    – float or None
+            cumulative_steam  – float or None
+
+        Returns all-None dict when injection_monthly is absent or the well
+        has no rows.
+        """
+        empty = {
+            "cumulative_water": None,
+            "cumulative_gas": None,
+            "cumulative_steam": None,
+        }
+
+        if not _table_exists("injection_monthly"):
+            return empty
+
+        row = (
+            InjectionMonthly.objects.filter(base_uwi=base_uwi)
+            .order_by("-injection_month")
+            .values("cumulative_water", "cumulative_gas", "cumulative_steam")
+            .first()
+        )
+
+        if row is None:
+            return empty
+
+        return {
+            "cumulative_water": row["cumulative_water"],
+            "cumulative_gas": row["cumulative_gas"],
+            "cumulative_steam": row["cumulative_steam"],
+        }
+
+    @staticmethod
+    def get_mapped_injection_wells_queryset(
+        operator_name: list[str] | None = None,
+    ) -> QuerySet:
+        """Return an annotated queryset of wells that have injection data AND coordinates.
+
+        Mirrors ProductionQueries.get_mapped_wells_queryset but restricts the
+        result to wells that have at least one row in injection_daily. Used to
+        power an injection bubble map layer.
+
+        The `operator_name` filter works the same way as in
+        WellQueries.filter_wells (cache → fallback).
+
+        Returns an empty queryset when injection_daily does not exist.
+        """
+        if not _table_exists("injection_daily"):
+            return WellHeader.objects.none()
+
+        injection_uwis_sql = "SELECT DISTINCT base_uwi FROM injection_daily"
+        with connection.cursor() as cursor:
+            cursor.execute(injection_uwis_sql)
+            injection_uwis = [row[0] for row in cursor.fetchall()]
+
+        if not injection_uwis:
+            return WellHeader.objects.none()
+
+        mapped_uwis = (
+            WellLocation.objects.exclude(latitude__isnull=True)
+            .exclude(longitude__isnull=True)
+            .values_list("base_uwi", flat=True)
+            .distinct()
+        )
+
+        queryset = (
+            WellQueries.get_annotated_queryset()
+            .filter(base_uwi__in=mapped_uwis)
+            .filter(base_uwi__in=injection_uwis)
+        )
+
+        if operator_name:
+            queryset = WellQueries.filter_wells(queryset, operator_name=operator_name)
+
+        return queryset
