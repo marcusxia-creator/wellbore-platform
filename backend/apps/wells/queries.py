@@ -6,6 +6,7 @@ these methods to fetch data.
 """
 
 from django.db.models import OuterRef, Q, QuerySet, Subquery
+from django.shortcuts import get_object_or_404
 
 from apps.wells.models import WellHeader, WellProductionFormation, WellStatusCategory
 
@@ -72,6 +73,12 @@ class WellQueries:
             )
 
         return queryset.order_by("base_uwi", "-suffix", "-raw_id").distinct("base_uwi")
+
+    @staticmethod
+    def get_well_detail(base_uwi: str) -> WellHeader:
+        """Return a single well with all related data prefetched, or 404."""
+        queryset = WellQueries.get_annotated_queryset()
+        return get_object_or_404(queryset, base_uwi=base_uwi)
 
 
 class MetadataQueries:

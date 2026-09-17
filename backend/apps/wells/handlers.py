@@ -7,6 +7,7 @@ deal with HTTP; handlers hold the "what to call and in what order" logic.
 
 from django.db.models import QuerySet
 
+from apps.wells.models import WellHeader
 from apps.wells.queries import MetadataQueries, WellQueries
 from apps.wells.services.well_status_service import STATUS_CATEGORIES
 
@@ -26,6 +27,11 @@ class WellHandler:
             formations=params.getlist("prod_inject_frmtn"),
             search=params.get("search"),
         )
+
+    @staticmethod
+    def get_well_detail(base_uwi: str):
+        """Return a single well with all related data, or raise 404."""
+        return WellQueries.get_well_detail(base_uwi)
 
 
 class MetadataHandler:
