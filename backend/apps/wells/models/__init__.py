@@ -8,6 +8,8 @@ from .well_casing import WellCasing
 from .well_production_summary import WellProductionSummary
 from .well_production_formation import WellProductionFormation
 from .production_monthly import ProductionMonthly
+from .injection_daily import InjectionDaily
+from .injection_monthly import InjectionMonthly
 from .wellstor_all import WellstorAll
 
 __all__ = [
@@ -22,5 +24,7 @@ __all__ = [
     "WellProductionSummary",
     "WellProductionFormation",
     "ProductionMonthly",
+    "InjectionDaily",
+    "InjectionMonthly",
     "WellstorAll",
 ]
